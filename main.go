@@ -10,13 +10,12 @@ import (
     "strings"
     "sync"
     "time"
+    "os"
+    "bufio"
 )
 
 // BlockedURLs is a list of URLs that the proxy will block.
-var BlockedURLs = []string{
-    "example.com",
-    "blocked.com",
-}
+var BlockedURLs = []string{} // read from blockedURLs
 
 // CachedResponse stores the HTTP response and its expiration time.
 type CachedResponse struct {
@@ -100,20 +99,20 @@ func cloneResponse(resp *http.Response) *http.Response {
     body, _ := io.ReadAll(resp.Body)
     resp.Body = io.NopCloser(io.MultiReader(strings.NewReader(string(body))))
     return &http.Response{
-        Status:           resp.Status,
+        Status:           resp.Status, // Clone the response status.
         StatusCode:       resp.StatusCode,
         Proto:            resp.Proto,
-        ProtoMajor:       resp.ProtoMajor,
-        ProtoMinor:       resp.ProtoMinor,
+        ProtoMajor:       resp.ProtoMajor, // Clone the protocol version.
+        ProtoMinor:       resp.ProtoMinor, // Clone the protocol version.
         Header:           resp.Header,
-        Body:             io.NopCloser(strings.NewReader(string(body))),
+        Body:             io.NopCloser(strings.NewReader(string(body))), // Clone the body.
         ContentLength:    resp.ContentLength,
-        TransferEncoding: resp.TransferEncoding,
+        TransferEncoding: resp.TransferEncoding, // Clone the transfer encoding.
         Close:            resp.Close,
         Uncompressed:     resp.Uncompressed,
         Trailer:          resp.Trailer,
         Request:          resp.Request,
-        TLS:              resp.TLS,
+        TLS:              resp.TLS, // Clone the TLS connection state.
     }
 }
 
@@ -124,17 +123,17 @@ func handleHTTPS(w http.ResponseWriter, r *http.Request) {
         http.Error(w, err.Error(), http.StatusServiceUnavailable)
         return
     }
-    hijacker, ok := w.(http.Hijacker)
+    hijacker, ok := w.(http.Hijacker) // Hijack the connection.
     if !ok {
         http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
         return
     }
-    clientConn, _, err := hijacker.Hijack()
+    clientConn, _, err := hijacker.Hijack() 
     if err != nil {
         http.Error(w, err.Error(), http.StatusServiceUnavailable)
         return
     }
-    clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+    clientConn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")) // Send a 200 OK response.
     go transfer(destConn, clientConn)
     go transfer(clientConn, destConn)
 }
@@ -145,7 +144,30 @@ func transfer(destination io.WriteCloser, source io.ReadCloser) {
     io.Copy(destination, source)
 }
 
+// readBlockedURLs reads the list of blocked URLs from a file.
+func readBlockedURLs() []string {
+    blockedURLs := []string{}
+    file, err := os.Open("blockedURLs")
+    if err != nil {
+        log.Println("Blocked URLs file not found")
+        return blockedURLs
+    }
+    defer file.Close()
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+        blockedURLs = append(blockedURLs, scanner.Text())
+    }
+    if err := scanner.Err(); err != nil {
+        log.Println("Error reading blocked URLs file")
+    }
+    return blockedURLs
+}
+
 func main() {
+
+    //read file for blocked urls
+    BlockedURLs = readBlockedURLs()
+
     // Handle HTTP requests
     http.HandleFunc("/", ProxyHandler)
     // Handle HTTPS requests
