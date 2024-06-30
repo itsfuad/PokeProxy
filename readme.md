@@ -19,6 +19,7 @@ This is a simple HTTP/HTTPS proxy server implemented in Go. It allows you to int
 
 ```bash
    git clone https://github.com/itsfuad/pokeproxy.git
+```
 ```bash
    cd pokeproxy
 ```
