@@ -44,6 +44,7 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
         if strings.Contains(targetURL.Host, blocked) {
             http.Error(w, "Access to this URL is blocked", http.StatusForbidden)
             log.Printf("Blocked request to: %s", targetURL)
+            writeLog(BLOCKED, formatBlockText(targetURL.String()))
             return
         }
     }
